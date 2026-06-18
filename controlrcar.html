@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RC Car Controller</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:      #080c12;
+  --panel:   #0d1420;
+  --card:    #111927;
+  --raised:  #16202e;
+  --border:  #1e2d42;
+  --borderL: #1e4060;
+  --blue:    #1d7fc4;
+  --blueL:   #38b6ff;
+  --blueG:   #38b6ff44;
+  --red:     #c43d3d;
+  --redL:    #ff4d4d;
+  --redG:    #ff4d4d44;
+  --amber:   #f5a623;
+  --amberG:  #f5a62344;
+  --green:   #39d98a;
+  --greenG:  #39d98a33;
+  --t1:#e8f4ff; --t2:#7a9ab8; --t3:#3d5a74;
+}
+html,body{height:100%;background:var(--bg);color:var(--t1);font-family:'Inter',sans-serif;font-size:14px;overflow-x:hidden;-webkit-tap-highlight-color:transparent;user-select:none}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(29,127,196,.04)1px,transparent 1px),linear-gradient(90deg,rgba(29,127,196,.04)1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+
+#app{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;padding:10px;gap:8px;max-width:680px;margin:0 auto}
+
+/* HEADER */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--panel);border:1px solid var(--border);border-radius:12px}
+.hdr-logo{display:flex;align-items:center;gap:10px}
+.hdr-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--blue),var(--blueL));border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 0 14px var(--blueG)}
+.hdr-title{font-family:'Orbitron',monospace;font-weight:900;font-size:15px;letter-spacing:2px}
+.hdr-sub{font-size:9px;color:var(--t3);letter-spacing:3px;margin-top:1px}
+#btnConn{display:flex;align-items:center;gap:7px;padding:7px 14px;background:var(--raised);border:1px solid var(--borderL);border-radius:9px;cursor:pointer;font-family:'Orbitron',monospace;font-size:10px;font-weight:700;letter-spacing:1px;color:var(--blueL);transition:all .2s}
+#btnConn:hover{background:var(--blue);box-shadow:0 0 12px var(--blueG)}
+#btnConn.on{color:var(--green);border-color:var(--green)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--t3);transition:all .3s}
+.dot.on{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 1.5s infinite}
+.dot.scan{background:var(--amber);animation:pulse .5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* STATUS */
+.sbar{display:flex;gap:6px;padding:7px 12px;background:var(--panel);border:1px solid var(--border);border-radius:9px;font-family:'Orbitron',monospace;font-size:10px;color:var(--t2);letter-spacing:1px;overflow-x:auto;flex-wrap:nowrap}
+.si{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.sl{color:var(--t3)}.sv{color:var(--blueL);font-weight:700}.ss{color:var(--borderL)}
+
+/* CARD */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px}
+.ctitle{font-family:'Orbitron',monospace;font-size:9px;font-weight:700;letter-spacing:3px;color:var(--t3);text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.ctitle::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--borderL),transparent)}
+
+/* ── THROTTLE CUSTOM DRAG ── */
+.drive-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
+.thr-wrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+.thr-label{font-family:'Orbitron',monospace;font-size:9px;letter-spacing:2px;color:var(--t3)}
+.thr-drag{position:relative;width:72px;height:220px;background:var(--raised);border:1px solid var(--borderL);border-radius:36px;touch-action:none;cursor:ns-resize;overflow:hidden;box-shadow:inset 0 2px 8px rgba(0,0,0,.4)}
+.thr-fill{position:absolute;left:0;right:0;background:linear-gradient(to top,var(--blue),var(--blueL));border-radius:36px;transition:background .15s;pointer-events:none}
+.thr-fill.rev{background:linear-gradient(to bottom,var(--red),var(--redL))}
+.thr-mid{position:absolute;left:6px;right:6px;top:50%;height:2px;background:var(--blueL);opacity:.4;pointer-events:none;border-radius:2px}
+.thr-thumb{position:absolute;left:50%;transform:translateX(-50%);width:52px;height:52px;background:radial-gradient(circle at 35% 35%,var(--blueL),var(--blue));border:2px solid var(--blueL);border-radius:50%;box-shadow:0 0 16px var(--blueG);pointer-events:none;transition:box-shadow .1s}
+.thr-drag.active .thr-thumb{box-shadow:0 0 28px var(--blueL)}
+.thr-zero{width:72px;padding:6px 0;background:var(--raised);border:1px solid var(--borderL);border-radius:8px;font-family:'Orbitron',monospace;font-size:9px;text-align:center;cursor:pointer;color:var(--t2);transition:all .15s}
+.thr-zero:active{color:var(--redL);border-color:var(--redL);box-shadow:0 0 8px var(--redG)}
+.thr-pct{font-family:'Orbitron',monospace;font-size:20px;font-weight:900;color:var(--blueL);text-align:center}
+.thr-pct.rev{color:var(--redL)}
+.thr-dir{font-size:9px;color:var(--t3);letter-spacing:1px;margin-top:-4px;text-align:center}
+
+/* STEER */
+.str-wrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+.str-label{font-family:'Orbitron',monospace;font-size:9px;letter-spacing:2px;color:var(--t3)}
+
+.str-vis{position:relative;width:140px;height:70px;margin-bottom:4px}
+.str-arc{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:130px;height:130px;border:2px solid var(--borderL);border-radius:50%;clip-path:inset(50% 0 0 0)}
+.str-needle{position:absolute;bottom:0;left:50%;width:2px;height:62px;background:linear-gradient(to top,transparent,var(--blueL));transform-origin:bottom center;transform:rotate(0deg);border-radius:2px 2px 0 0;transition:transform .08s}
+.str-val{font-family:'Orbitron',monospace;font-size:18px;font-weight:900;color:var(--blueL)}
+
+/* Horizontal range steer */
+.str-range{-webkit-appearance:none;width:100%;height:6px;background:var(--raised);border:1px solid var(--borderL);border-radius:10px;outline:none;cursor:pointer;margin:4px 0}
+.str-range::-webkit-slider-thumb{-webkit-appearance:none;width:40px;height:40px;background:radial-gradient(circle at 35% 35%,var(--blueL),var(--blue));border:2px solid var(--blueL);border-radius:50%;box-shadow:0 0 12px var(--blueG);cursor:pointer;transition:box-shadow .15s}
+.str-range::-webkit-slider-thumb:active{box-shadow:0 0 22px var(--blueL)}
+.str-range::-moz-range-thumb{width:38px;height:38px;background:radial-gradient(circle at 35% 35%,var(--blueL),var(--blue));border:2px solid var(--blueL);border-radius:50%;box-shadow:0 0 12px var(--blueG);cursor:pointer}
+
+.str-btns{display:flex;gap:6px;width:100%}
+.str-btn{flex:1;padding:8px 0;background:var(--raised);border:1px solid var(--borderL);border-radius:8px;font-family:'Orbitron',monospace;font-size:10px;color:var(--t2);cursor:pointer;text-align:center;transition:all .15s;-webkit-user-select:none}
+.str-btn:active{background:var(--blue);color:var(--t1);box-shadow:0 0 12px var(--blueG)}
+
+/* SUSPENSI */
+.susp-row{display:flex;align-items:center;gap:12px}
+.susp-car{flex-shrink:0;width:66px}
+.susp-ctrls{flex:1;display:flex;flex-direction:column;gap:8px}
+.susp-sl-row{display:flex;align-items:center;gap:8px}
+.susp-icon{font-size:15px;width:18px;text-align:center}
+
+input[type=range].susp{-webkit-appearance:none;flex:1;height:6px;background:var(--raised);border:1px solid var(--borderL);border-radius:10px;outline:none;cursor:pointer}
+input[type=range].susp::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;background:radial-gradient(circle at 35% 35%,var(--blueL),var(--blue));border:2px solid var(--blueL);border-radius:50%;box-shadow:0 0 10px var(--blueG);cursor:pointer}
+input[type=range].susp::-moz-range-thumb{width:22px;height:22px;background:radial-gradient(circle at 35% 35%,var(--blueL),var(--blue));border:2px solid var(--blueL);border-radius:50%;box-shadow:0 0 10px var(--blueG);cursor:pointer}
+
+.susp-badge{font-family:'Orbitron',monospace;font-size:12px;font-weight:700;color:var(--t1);background:var(--raised);border:1px solid var(--borderL);border-radius:7px;padding:3px 9px;min-width:48px;text-align:center}
+
+.spd-row{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--t2)}
+input[type=range].spd{-webkit-appearance:none;flex:1;height:5px;background:var(--raised);border:1px solid var(--borderL);border-radius:8px;outline:none;cursor:pointer}
+input[type=range].spd::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;background:radial-gradient(circle at 35% 35%,var(--amber),#c47a00);border:2px solid var(--amber);border-radius:50%;box-shadow:0 0 8px var(--amberG);cursor:pointer}
+input[type=range].spd::-moz-range-thumb{width:18px;height:18px;background:radial-gradient(circle at 35% 35%,var(--amber),#c47a00);border:2px solid var(--amber);border-radius:50%;box-shadow:0 0 8px var(--amberG);cursor:pointer}
+.spd-badges{display:flex;gap:4px}
+.spdb{font-size:9px;padding:2px 6px;border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--t3);font-family:'Orbitron',monospace;transition:all .15s}
+.spdb.on,.spdb:hover{color:var(--amber);border-color:var(--amber);box-shadow:0 0 7px var(--amberG)}
+
+/* LAMPU */
+.lights-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:7px}
+.lbtn{display:flex;flex-direction:column;align-items:center;gap:5px;padding:11px 6px;background:var(--card);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.lbtn::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .2s;border-radius:10px}
+.lbtn.on::before{opacity:1}
+.lbtn-i{font-size:20px;position:relative;z-index:1}
+.lbtn-l{font-family:'Orbitron',monospace;font-size:8px;letter-spacing:1px;color:var(--t3);text-align:center;position:relative;z-index:1;transition:color .2s}
+.lbtn.on .lbtn-l{color:var(--t1)}
+.blink-dot{width:7px;height:7px;border-radius:50%;background:var(--amber);box-shadow:0 0 7px var(--amber);display:none;animation:pulse .5s infinite;position:relative;z-index:1}
+.lbtn.on .blink-dot{display:block}
+
+.ld{--gc:rgba(245,224,80,.08)}.ld::before{background:var(--gc)}.ld.on{border-color:#f5e050;box-shadow:0 0 12px rgba(245,224,80,.3)}
+.lb{--gc:rgba(255,77,77,.08)}.lb::before{background:var(--gc)}.lb.on{border-color:var(--redL);box-shadow:0 0 12px var(--redG)}
+.sk{--gc:rgba(245,166,35,.1)}.sk::before{background:var(--gc)}.sk.on{border-color:var(--amber);box-shadow:0 0 12px var(--amberG)}
+.hzrd{--gc:rgba(255,77,77,.1)}.hzrd::before{background:var(--gc)}.hzrd.on{border-color:var(--redL);box-shadow:0 0 16px var(--redG);animation:hzpulse .5s infinite}
+@keyframes hzpulse{0%,100%{box-shadow:0 0 16px var(--redG)}50%{box-shadow:0 0 28px var(--redL),0 0 50px var(--redG)}}
+
+/* OVERLAY */
+#ov{position:fixed;inset:0;background:rgba(8,12,18,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;gap:18px;backdrop-filter:blur(6px)}
+#ov.hide{display:none}
+.ov-ring{width:90px;height:90px;border-radius:50%;border:3px solid var(--borderL);border-top-color:var(--blueL);position:relative;animation:spin 2s linear infinite}
+.ov-ring::before{content:'';position:absolute;inset:8px;border-radius:50%;border:2px solid var(--border);border-bottom-color:var(--blue);animation:spin 1.5s linear infinite reverse}
+.ov-icon{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:26px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ov-title{font-family:'Orbitron',monospace;font-size:17px;font-weight:900;letter-spacing:4px}
+.ov-sub{font-size:12px;color:var(--t2);letter-spacing:1px;text-align:center;max-width:240px;line-height:1.6}
+.ov-btn{padding:11px 28px;background:linear-gradient(135deg,var(--blue),var(--blueL));border:none;border-radius:10px;font-family:'Orbitron',monospace;font-size:11px;font-weight:700;letter-spacing:2px;color:#fff;cursor:pointer;box-shadow:0 0 18px var(--blueG);transition:all .2s}
+.ov-btn:hover{transform:translateY(-2px);box-shadow:0 4px 22px var(--blueL)}
+
+/* TOAST */
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(70px);background:var(--raised);border:1px solid var(--borderL);border-radius:9px;padding:9px 18px;font-size:12px;color:var(--t1);transition:transform .3s;z-index:200;white-space:nowrap}
+#toast.show{transform:translateX(-50%) translateY(0)}
+::-webkit-scrollbar{width:3px;height:3px}::-webkit-scrollbar-thumb{background:var(--borderL);border-radius:3px}
+</style>
+</head>
+<body>
+
+<div id="ov">
+  <div class="ov-ring" style="position:relative"><span class="ov-icon">📡</span></div>
+  <div class="ov-title">RC · CAR</div>
+  <div class="ov-sub">Hubungkan ke ESP32-C3 via Bluetooth untuk mulai</div>
+  <button class="ov-btn" onclick="connectBLE()">CONNECT BLUETOOTH</button>
+</div>
+<div id="toast"></div>
+
+<div id="app">
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-logo">
+      <div class="hdr-icon">🏎️</div>
+      <div>
+        <div class="hdr-title">RC · CAR</div>
+        <div class="hdr-sub">SLIDER CONTROLLER</div>
+      </div>
+    </div>
+    <button id="btnConn" onclick="connectBLE()">
+      <span class="dot" id="dot"></span>
+      <span id="bleLabel">CONNECT</span>
+    </button>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div class="sbar">
+    <div class="si"><span class="sl">STEER</span><span class="sv" id="stSteer">0°</span></div>
+    <span class="ss">│</span>
+    <div class="si"><span class="sl">GAS</span><span class="sv" id="stThr">0%</span></div>
+    <span class="ss">│</span>
+    <div class="si"><span class="sl">SUSP</span><span class="sv" id="stSusp">MID</span></div>
+    <span class="ss">│</span>
+    <div class="si"><span class="sl">BLE</span><span class="sv" id="stBle" style="color:var(--redL)">OFFLINE</span></div>
+  </div>
+
+  <!-- DRIVE -->
+  <div class="card">
+    <div class="ctitle">🎮 DRIVE — slider tetap di posisi terakhir</div>
+    <div class="drive-row">
+
+      <!-- THROTTLE custom drag -->
+      <div class="thr-wrap">
+        <div class="thr-label">GAS / REM</div>
+        <div class="thr-drag" id="thrDrag">
+          <div class="thr-mid"></div>
+          <div class="thr-fill" id="thrFill"></div>
+          <div class="thr-thumb" id="thrThumb"></div>
+        </div>
+        <div class="thr-zero" onclick="thrZero()">■ STOP</div>
+        <div class="thr-pct" id="thrPct">0%</div>
+        <div class="thr-dir" id="thrDir">NETRAL</div>
+      </div>
+
+      <!-- STEERING -->
+      <div class="str-wrap">
+        <div class="str-label">SETIR</div>
+        <!-- Arc visual -->
+        <div class="str-vis">
+          <div class="str-arc"></div>
+          <div class="str-needle" id="strNeedle"></div>
+        </div>
+        <div class="str-val" id="strVal">0°</div>
+        <input type="range" class="str-range" id="slStr" min="45" max="135" value="90" step="1">
+        <div class="str-btns">
+          <div class="str-btn" id="btnStrL" ontouchstart="strHold(-1)" ontouchend="strStop()" onmousedown="strHold(-1)" onmouseup="strStop()">◀ KIRI</div>
+          <div class="str-btn" onclick="strCenter()">CTR</div>
+          <div class="str-btn" id="btnStrR" ontouchstart="strHold(1)" ontouchend="strStop()" onmousedown="strHold(1)" onmouseup="strStop()">KANAN ▶</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SUSPENSI -->
+  <div class="card">
+    <div class="ctitle">🔧 SUSPENSION</div>
+    <div class="susp-row">
+      <svg class="susp-car" viewBox="0 0 66 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <line x1="4" y1="82" x2="62" y2="82" stroke="#1e4060" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <circle id="sWFL" cx="17" cy="78" r="8" stroke="#1d7fc4" stroke-width="2" fill="#0d1420"/>
+        <circle cx="17" cy="78" r="3" fill="#1d7fc4"/>
+        <circle id="sWRL" cx="49" cy="78" r="8" stroke="#1d7fc4" stroke-width="2" fill="#0d1420"/>
+        <circle cx="49" cy="78" r="3" fill="#1d7fc4"/>
+        <line id="sSFL" x1="17" y1="70" x2="17" y2="55" stroke="#38b6ff" stroke-width="2"/>
+        <line id="sSRL" x1="49" y1="70" x2="49" y2="55" stroke="#38b6ff" stroke-width="2"/>
+        <rect id="sCB" x="7" y="30" width="52" height="24" rx="4" fill="#111927" stroke="#1d7fc4" stroke-width="1.5"/>
+        <rect id="sCR" x="17" y="16" width="32" height="15" rx="4" fill="#0d1420" stroke="#1e4060" stroke-width="1.5"/>
+        <rect x="7" y="38" width="5" height="6" rx="2" fill="#f5e050" opacity=".6"/>
+        <rect x="54" y="38" width="5" height="6" rx="2" fill="#ff4d4d" opacity=".6"/>
+      </svg>
+      <div class="susp-ctrls">
+        <div class="susp-sl-row">
+          <span class="susp-icon">🔽</span>
+          <input type="range" class="susp" id="slSusp" min="0" max="100" value="50">
+          <span class="susp-icon">🔼</span>
+          <div class="susp-badge" id="suspBadge">MID</div>
+        </div>
+        <div class="spd-row">
+          <span style="white-space:nowrap;font-size:10px">Kecepatan:</span>
+          <input type="range" class="spd" id="slSuspSpd" min="1" max="10" value="3">
+          <div class="spd-badges">
+            <div class="spdb" onclick="setSuspSpd(1)">BUS</div>
+            <div class="spdb" onclick="setSuspSpd(5)">MID</div>
+            <div class="spdb on" onclick="setSuspSpd(10)">FAST</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LAMPU -->
+  <div class="card">
+    <div class="ctitle">💡 LIGHTING</div>
+    <div class="lights-grid">
+      <div class="lbtn ld" id="bLD" onclick="togLight('LDEPAN','bLD')">
+        <span class="lbtn-i">🔦</span>
+        <span class="lbtn-l">DEPAN</span>
+      </div>
+      <div class="lbtn lb" id="bLB" onclick="togLight('LBELAKANG','bLB')">
+        <span class="lbtn-i">🔴</span>
+        <span class="lbtn-l">BELAKANG</span>
+      </div>
+      <div class="lbtn sk" id="bSK" onclick="togSein('SEIN_KANAN','bSK','r')">
+        <span class="lbtn-i">↪️</span>
+        <div class="blink-dot"></div>
+        <span class="lbtn-l">SEIN ▶</span>
+      </div>
+      <div class="lbtn sk" id="bSKi" onclick="togSein('SEIN_KIRI','bSKi','l')">
+        <span class="lbtn-i">↩️</span>
+        <div class="blink-dot"></div>
+        <span class="lbtn-l">◀ SEIN</span>
+      </div>
+    </div>
+    <div class="lbtn hzrd" id="bHz" onclick="togHazard()" style="padding:12px">
+      <span class="lbtn-i" style="font-size:26px">⚠️</span>
+      <div class="blink-dot" style="margin:0 auto"></div>
+      <span class="lbtn-l" style="font-size:9px;letter-spacing:3px">HAZARD</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════ BLE ═══════════════
+const SVC  = '12345678-1234-1234-1234-123456789abc';
+const CHRX = '12345678-1234-1234-1234-123456789ab1';
+const CHTX = '12345678-1234-1234-1234-123456789ab2';
+let dev=null,charRX=null,isConn=false;
+
+async function connectBLE(){
+  try{
+    document.getElementById('dot').className='dot scan';
+    document.getElementById('bleLabel').textContent='SCANNING...';
+    dev = await navigator.bluetooth.requestDevice({filters:[{name:'RC-Car ESP32C3'}],optionalServices:[SVC]});
+    dev.addEventListener('gattserverdisconnected',onDisc);
+    const srv = await dev.gatt.connect();
+    const svc = await srv.getPrimaryService(SVC);
+    charRX    = await svc.getCharacteristic(CHRX);
+    const tx  = await svc.getCharacteristic(CHTX);
+    await tx.startNotifications();
+    onConn();
+  }catch(e){
+    document.getElementById('dot').className='dot';
+    document.getElementById('bleLabel').textContent='CONNECT';
+    toast('❌ '+e.message);
+  }
+}
+function onConn(){
+  isConn=true;
+  document.getElementById('ov').classList.add('hide');
+  document.getElementById('dot').className='dot on';
+  document.getElementById('bleLabel').textContent='ON';
+  document.getElementById('btnConn').classList.add('on');
+  document.getElementById('stBle').style.color='var(--green)';
+  document.getElementById('stBle').textContent='ONLINE';
+  toast('✅ Terhubung!');
+  send('PING:1');
+}
+function onDisc(){
+  isConn=false;
+  document.getElementById('ov').classList.remove('hide');
+  document.getElementById('dot').className='dot';
+  document.getElementById('bleLabel').textContent='CONNECT';
+  document.getElementById('btnConn').classList.remove('on');
+  document.getElementById('stBle').style.color='var(--redL)';
+  document.getElementById('stBle').textContent='OFFLINE';
+  toast('⚡ Putus');
+}
+async function send(cmd){
+  if(!isConn||!charRX)return;
+  try{ await charRX.writeValueWithoutResponse(new TextEncoder().encode(cmd+'\n')); }
+  catch(e){ console.warn(e); }
+}
+
+// ═══════════════ THROTTLE (custom touch drag) ═══════════════
+const thrDrag  = document.getElementById('thrDrag');
+const thrFill  = document.getElementById('thrFill');
+const thrThumb = document.getElementById('thrThumb');
+const thrPct   = document.getElementById('thrPct');
+const thrDir   = document.getElementById('thrDir');
+
+let thrVal = 0;          // -255 to 255, tetap setelah lepas
+let thrDragging = false;
+let thrTouchId  = null;
+let thrSendTimer = null;
+
+// Hitung nilai throttle dari posisi Y dalam area drag
+function yToThr(clientY) {
+  const rect = thrDrag.getBoundingClientRect();
+  const h    = rect.height;
+  // y=0 (atas) = +255 (maju penuh), y=h (bawah) = -255 (mundur penuh)
+  const rel  = Math.max(0, Math.min(h, clientY - rect.top));
+  return Math.round(255 - (rel / h) * 510);
+}
+
+function applyThr(v) {
+  thrVal = Math.max(-255, Math.min(255, v));
+  updateThrUI(thrVal);
+  clearTimeout(thrSendTimer);
+  thrSendTimer = setTimeout(() => send('THR:' + thrVal), 20);
+}
+
+function updateThrUI(v) {
+  const h    = thrDrag.offsetHeight;
+  const half = h / 2;
+  // Posisi thumb: tengah=0, atas=+255, bawah=-255
+  const thumbY = half - (v / 255) * (half - 26);
+  thrThumb.style.top = (thumbY - 26) + 'px';
+
+  // Fill bar
+  const fillH = Math.abs(v) / 255 * half;
+  if (v >= 0) {
+    thrFill.style.bottom  = half + 'px';
+    thrFill.style.top     = '';
+    thrFill.style.height  = fillH + 'px';
+    thrFill.className     = 'thr-fill';
+  } else {
+    thrFill.style.top     = half + 'px';
+    thrFill.style.bottom  = '';
+    thrFill.style.height  = fillH + 'px';
+    thrFill.className     = 'thr-fill rev';
+  }
+
+  const pct  = Math.round(Math.abs(v) / 255 * 100);
+  const sign = v > 0 ? '+' : v < 0 ? '−' : '';
+  thrPct.textContent = sign + pct + '%';
+  thrPct.className   = v < 0 ? 'thr-pct rev' : 'thr-pct';
+  thrDir.textContent = v > 0 ? 'MAJU ▲' : v < 0 ? '▼ MUNDUR' : 'NETRAL';
+  thrDir.style.color = v > 0 ? 'var(--blueL)' : v < 0 ? 'var(--redL)' : 'var(--t3)';
+  document.getElementById('stThr').textContent = sign + pct + '%';
+}
+
+// Touch events
+thrDrag.addEventListener('touchstart', e => {
+  e.preventDefault();
+  thrDragging = true;
+  thrTouchId  = e.changedTouches[0].identifier;
+  thrDrag.classList.add('active');
+  applyThr(yToThr(e.changedTouches[0].clientY));
+}, { passive: false });
+
+thrDrag.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (!thrDragging) return;
+  const t = [...e.changedTouches].find(t => t.identifier === thrTouchId);
+  if (t) applyThr(yToThr(t.clientY));
+}, { passive: false });
+
+thrDrag.addEventListener('touchend', e => {
+  e.preventDefault();
+  thrDragging = false;
+  thrDrag.classList.remove('active');
+  // Tidak reset ke 0 — throttle tetap di posisi terakhir
+}, { passive: false });
+
+// Mouse events (desktop)
+thrDrag.addEventListener('mousedown', e => {
+  thrDragging = true;
+  thrDrag.classList.add('active');
+  applyThr(yToThr(e.clientY));
+});
+document.addEventListener('mousemove', e => {
+  if (thrDragging) applyThr(yToThr(e.clientY));
+});
+document.addEventListener('mouseup', () => {
+  thrDragging = false;
+  thrDrag.classList.remove('active');
+});
+
+function thrZero() {
+  applyThr(0);
+  send('THR:0');
+}
+
+// ═══════════════ STEERING ═══════════════
+const slStr     = document.getElementById('slStr');
+const strNeedle = document.getElementById('strNeedle');
+const strValEl  = document.getElementById('strVal');
+
+let strHoldTimer = null;
+let strCurrent   = 90;
+
+slStr.addEventListener('input',()=>{
+  const v = parseInt(slStr.value);
+  strCurrent = v;
+  updateStrUI(v);
+  send('STEER:'+v);
+});
+
+function updateStrUI(v){
+  const deg = v - 90;
+  strNeedle.style.transform = `rotate(${deg}deg)`;
+  const sign = deg>0?'+':'';
+  strValEl.textContent = sign+deg+'°';
+  document.getElementById('stSteer').textContent = sign+deg+'°';
+}
+
+// Tombol hold kiri/kanan — geser pelan saat ditahan
+function strHold(dir){
+  if(strHoldTimer) return;
+  strHoldTimer = setInterval(()=>{
+    strCurrent = Math.max(45, Math.min(135, strCurrent + dir*2));
+    slStr.value = strCurrent;
+    updateStrUI(strCurrent);
+    send('STEER:'+strCurrent);
+  }, 50);
+}
+function strStop(){
+  clearInterval(strHoldTimer);
+  strHoldTimer = null;
+}
+function strCenter(){
+  strCurrent = 90;
+  slStr.value = 90;
+  updateStrUI(90);
+  send('STEER:90');
+}
+
+// ═══════════════ SUSPENSI ═══════════════
+const slSusp = document.getElementById('slSusp');
+const suspBadge = document.getElementById('suspBadge');
+let suspTimer = null;
+
+slSusp.addEventListener('input',()=>{
+  const v = parseInt(slSusp.value);
+  const deg = Math.round(45 + v*0.9); // 45-135
+  updateSuspUI(v,deg);
+  clearTimeout(suspTimer);
+  suspTimer = setTimeout(()=>send('SUSP:'+deg), 60);
+});
+
+function updateSuspUI(pct,deg){
+  const lbl = pct<15?'LOW':pct<35?'LOW+':pct<55?'MID':pct<75?'HIGH':'MAX';
+  suspBadge.textContent = lbl;
+  document.getElementById('stSusp').textContent = lbl;
+  // SVG car
+  const by = 44 - (pct-50)*0.14;
+  const ry = by - 14;
+  document.getElementById('sCB').setAttribute('y',by);
+  document.getElementById('sCR').setAttribute('y',ry);
+  document.getElementById('sSFL').setAttribute('y1',by+24);
+  document.getElementById('sSRL').setAttribute('y1',by+24);
+  slSusp.style.background=`linear-gradient(to right,var(--blueL) ${pct}%,var(--raised) ${pct}%)`;
+}
+
+const slSuspSpd = document.getElementById('slSuspSpd');
+slSuspSpd.addEventListener('input',()=>{
+  const v = parseInt(slSuspSpd.value);
+  send('SUSP_SPD:'+v);
+});
+function setSuspSpd(v){
+  slSuspSpd.value=v;
+  send('SUSP_SPD:'+v);
+  document.querySelectorAll('.spdb').forEach(b=>b.classList.remove('on'));
+  const i = v===1?0:v===5?1:2;
+  document.querySelectorAll('.spdb')[i].classList.add('on');
+}
+
+// ═══════════════ LAMPU ═══════════════
+const ls={LDEPAN:false,LBELAKANG:false,SEIN_KANAN:false,SEIN_KIRI:false,HAZARD:false};
+
+function togLight(k,id){
+  ls[k]=!ls[k];
+  document.getElementById(id).classList.toggle('on',ls[k]);
+  send(k+':'+(ls[k]?1:0));
+}
+
+function togSein(k,id,side){
+  const nyala = !ls[k]; // state baru
+  ls[k] = nyala;
+
+  if(nyala){
+    // Matikan sein lawan di UI saja (tanpa kirim command ke ESP32)
+    // ESP32 sudah handle di firmware saat terima SEIN_KANAN:1
+    if(side==='r'){
+      ls.SEIN_KIRI=false;
+      document.getElementById('bSKi').classList.remove('on');
+    } else {
+      ls.SEIN_KANAN=false;
+      document.getElementById('bSK').classList.remove('on');
+    }
+    // Matikan hazard di UI saja
+    ls.HAZARD=false;
+    document.getElementById('bHz').classList.remove('on');
+  }
+
+  document.getElementById(id).classList.toggle('on',nyala);
+  // Kirim HANYA 1 command — firmware yang urus sisanya
+  send(k+':'+(nyala?1:0));
+}
+
+function togHazard(){
+  const nyala = !ls.HAZARD;
+  ls.HAZARD = nyala;
+
+  if(nyala){
+    // Matikan sein di UI saja, firmware urus pinnya
+    ls.SEIN_KANAN=false; ls.SEIN_KIRI=false;
+    document.getElementById('bSK').classList.remove('on');
+    document.getElementById('bSKi').classList.remove('on');
+  }
+
+  document.getElementById('bHz').classList.toggle('on',nyala);
+  // Kirim HANYA 1 command
+  send('HAZARD:'+(nyala?1:0));
+}
+
+// ═══════════════ TOAST ═══════════════
+let tt=null;
+function toast(m){
+  const t=document.getElementById('toast');
+  t.textContent=m;t.classList.add('show');
+  if(tt)clearTimeout(tt);
+  tt=setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ═══════════════ INIT ═══════════════
+window.onload=()=>{
+  updateThrUI(0);
+  updateStrUI(90);
+  updateSuspUI(50,90);
+  if(!navigator.bluetooth){
+    document.querySelector('.ov-sub').textContent='⚠️ Gunakan Chrome/Edge di Android atau Desktop.';
+  }
+};
+</script>
+</body>
+</html>
